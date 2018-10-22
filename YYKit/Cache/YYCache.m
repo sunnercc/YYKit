@@ -69,7 +69,7 @@
 - (id<NSCoding>)objectForKey:(NSString *)key {
     id<NSCoding> object = [_memoryCache objectForKey:key];
     if (!object) {
-        object = [_diskCache objectForKey:key];
+        object = [_diskCache objectForKey:key]; // 磁盘中找到之后，写入内存
         if (object) {
             [_memoryCache setObject:object forKey:key];
         }
@@ -87,7 +87,7 @@
     } else {
         [_diskCache objectForKey:key withBlock:^(NSString *key, id<NSCoding> object) {
             if (object && ![_memoryCache objectForKey:key]) {
-                [_memoryCache setObject:object forKey:key];
+                [_memoryCache setObject:object forKey:key];// 磁盘中找到之后，写入内存
             }
             block(key, object);
         }];

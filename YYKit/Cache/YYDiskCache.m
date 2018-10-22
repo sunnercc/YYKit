@@ -64,9 +64,9 @@ static void _YYDiskCacheSetGlobal(YYDiskCache *cache) {
 
 
 @implementation YYDiskCache {
-    YYKVStorage *_kv;
+    YYKVStorage *_kv;  // 包装
     dispatch_semaphore_t _lock;
-    dispatch_queue_t _queue;
+    dispatch_queue_t _queue; // 并发
 }
 
 - (void)_trimRecursively {
@@ -81,10 +81,10 @@ static void _YYDiskCacheSetGlobal(YYDiskCache *cache) {
 
 - (void)_trimInBackground {
     __weak typeof(self) _self = self;
-    dispatch_async(_queue, ^{
+    dispatch_async(_queue, ^{  // 并发队列
         __strong typeof(_self) self = _self;
         if (!self) return;
-        Lock();
+        Lock();   // 加锁
         [self _trimToCost:self.costLimit];
         [self _trimToCount:self.countLimit];
         [self _trimToAge:self.ageLimit];

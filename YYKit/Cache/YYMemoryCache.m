@@ -35,6 +35,7 @@ static inline dispatch_queue_t YYMemoryCacheGetReleaseQueue() {
  */
 @interface _YYLinkedMapNode : NSObject {
     @package
+    // __unsafe_unretained 相当于 __weak 若引用
     __unsafe_unretained _YYLinkedMapNode *_prev; // retained by dic
     __unsafe_unretained _YYLinkedMapNode *_next; // retained by dic
     id _key;
@@ -166,6 +167,7 @@ static inline dispatch_queue_t YYMemoryCacheGetReleaseQueue() {
             dispatch_queue_t queue = _releaseOnMainThread ? dispatch_get_main_queue() : YYMemoryCacheGetReleaseQueue();
             dispatch_async(queue, ^{
                 CFRelease(holder); // hold and release in specified queue
+                // ？？？
             });
         } else if (_releaseOnMainThread && !pthread_main_np()) {
             dispatch_async(dispatch_get_main_queue(), ^{
@@ -182,9 +184,9 @@ static inline dispatch_queue_t YYMemoryCacheGetReleaseQueue() {
 
 
 @implementation YYMemoryCache {
-    pthread_mutex_t _lock;
+    pthread_mutex_t _lock; // ？？？
     _YYLinkedMap *_lru;
-    dispatch_queue_t _queue;
+    dispatch_queue_t _queue;  // 串型队列
 }
 
 - (void)_trimRecursively {
@@ -198,7 +200,8 @@ static inline dispatch_queue_t YYMemoryCacheGetReleaseQueue() {
 }
 
 - (void)_trimInBackground {
-    dispatch_async(_queue, ^{
+    dispatch_async(_queue, ^{         // 串型队列，虽然是异步，但是只开辟一个子线程
+                                      // _queue中的任务都在同一个子线程中执行
         [self _trimToCost:self->_costLimit];
         [self _trimToCount:self->_countLimit];
         [self _trimToAge:self->_ageLimit];
@@ -207,14 +210,14 @@ static inline dispatch_queue_t YYMemoryCacheGetReleaseQueue() {
 
 - (void)_trimToCost:(NSUInteger)costLimit {
     BOOL finish = NO;
-    pthread_mutex_lock(&_lock);
+    pthread_mutex_lock(&_lock);  // 加锁
     if (costLimit == 0) {
         [_lru removeAll];
         finish = YES;
     } else if (_lru->_totalCost <= costLimit) {
         finish = YES;
     }
-    pthread_mutex_unlock(&_lock);
+    pthread_mutex_unlock(&_lock);  // 解锁
     if (finish) return;
     
     NSMutableArray *holder = [NSMutableArray new];
@@ -228,13 +231,13 @@ static inline dispatch_queue_t YYMemoryCacheGetReleaseQueue() {
             }
             pthread_mutex_unlock(&_lock);
         } else {
-            usleep(10 * 1000); //10 ms
+            usleep(10 * 1000); //10 ms。// ？？？
         }
     }
     if (holder.count) {
         dispatch_queue_t queue = _lru->_releaseOnMainThread ? dispatch_get_main_queue() : YYMemoryCacheGetReleaseQueue();
         dispatch_async(queue, ^{
-            [holder count]; // release in queue
+            [holder count]; // release in queue。// ？？？
         });
     }
 }
@@ -330,7 +333,7 @@ static inline dispatch_queue_t YYMemoryCacheGetReleaseQueue() {
 
 - (instancetype)init {
     self = super.init;
-    pthread_mutex_init(&_lock, NULL);
+    pthread_mutex_init(&_lock, NULL);  // 初始化lock。// 何处释放 dealloc处
     _lru = [_YYLinkedMap new];
     _queue = dispatch_queue_create("com.ibireme.cache.memory", DISPATCH_QUEUE_SERIAL);
     
@@ -344,7 +347,7 @@ static inline dispatch_queue_t YYMemoryCacheGetReleaseQueue() {
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_appDidReceiveMemoryWarningNotification) name:UIApplicationDidReceiveMemoryWarningNotification object:nil];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_appDidEnterBackgroundNotification) name:UIApplicationDidEnterBackgroundNotification object:nil];
     
-    [self _trimRecursively];
+    [self _trimRecursively];  // 自动清理 递归
     return self;
 }
 
@@ -352,7 +355,7 @@ static inline dispatch_queue_t YYMemoryCacheGetReleaseQueue() {
     [[NSNotificationCenter defaultCenter] removeObserver:self name:UIApplicationDidReceiveMemoryWarningNotification object:nil];
     [[NSNotificationCenter defaultCenter] removeObserver:self name:UIApplicationDidEnterBackgroundNotification object:nil];
     [_lru removeAll];
-    pthread_mutex_destroy(&_lock);
+    pthread_mutex_destroy(&_lock);  // 销毁
 }
 
 - (NSUInteger)totalCount {
