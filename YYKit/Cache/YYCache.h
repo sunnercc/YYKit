@@ -77,8 +77,8 @@ NS_ASSUME_NONNULL_BEGIN
  */
 + (nullable instancetype)cacheWithPath:(NSString *)path;
 
-- (instancetype)init UNAVAILABLE_ATTRIBUTE;
-+ (instancetype)new UNAVAILABLE_ATTRIBUTE;
+- (instancetype)init UNAVAILABLE_ATTRIBUTE; // 不可用
++ (instancetype)new UNAVAILABLE_ATTRIBUTE;  // 不可用
 
 #pragma mark - Access Methods
 ///=============================================================================
